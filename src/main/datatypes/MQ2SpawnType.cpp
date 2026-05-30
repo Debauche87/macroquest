@@ -162,6 +162,9 @@ enum class SpawnMembers
 	MyBuff,
 	MyBuffCount,
 	MyBuffDuration,
+	EncounterLockState,
+	EncounterLocked,
+	EncounterLockOwner,
 };
 
 enum class SpawnMethods
@@ -316,6 +319,9 @@ MQ2SpawnType::MQ2SpawnType() : MQ2Type("spawn")
 	ScopedTypeMember(SpawnMembers, MyBuff);
 	ScopedTypeMember(SpawnMembers, MyBuffCount);
 	ScopedTypeMember(SpawnMembers, MyBuffDuration);
+	ScopedTypeMember(SpawnMembers, EncounterLockState);
+	ScopedTypeMember(SpawnMembers, EncounterLocked);
+	ScopedTypeMember(SpawnMembers, EncounterLockOwner);
 
 	ScopedTypeMethod(SpawnMethods, DoTarget);
 	ScopedTypeMethod(SpawnMethods, DoFace);
@@ -1290,6 +1296,24 @@ bool MQ2SpawnType::GetMember(SPAWNINFO* pSpawn, const char* Member, char* Index,
 		Dest.DWord = pSpawn->CorpseDragCount;
 		Dest.Type = pIntType;
 		return true;
+
+	case SpawnMembers::EncounterLockState:
+		Dest.DWord = pSpawn->EncounterLockState;
+		Dest.Type = pIntType;
+		return true;
+
+	case SpawnMembers::EncounterLocked:
+		Dest.Set(pSpawn->EncounterLockState != 0);
+		Dest.Type = pBoolType;
+		return true;
+
+	case SpawnMembers::EncounterLockOwner:
+		if (PlayerClient* pOwner = pSpawn->EncounterLockOwner)
+		{
+			Dest = MakeTypeVar(pOwner);
+			return true;
+		}
+		return false;
 
 	case SpawnMembers::CombatSkillTicks:
 		Dest.DWord = 0;
