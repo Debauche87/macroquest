@@ -166,7 +166,6 @@ enum class SpawnMembers
 	EncounterLocked,
 	EncounterLockOwner,
 	EncounterLockOwnerID,
-
 };
 
 enum class SpawnMethods
