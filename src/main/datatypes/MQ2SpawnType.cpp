@@ -162,9 +162,11 @@ enum class SpawnMembers
 	MyBuff,
 	MyBuffCount,
 	MyBuffDuration,
+#if HAS_ENCOUNTER_LOCKING
 	EncounterLockState,
 	EncounterLocked,
-	EncounterLockOwner,
+	EncounterLockOwnerID,
+#endif // HAS_ENCOUNTER_LOCKING
 };
 
 enum class SpawnMethods
@@ -319,9 +321,11 @@ MQ2SpawnType::MQ2SpawnType() : MQ2Type("spawn")
 	ScopedTypeMember(SpawnMembers, MyBuff);
 	ScopedTypeMember(SpawnMembers, MyBuffCount);
 	ScopedTypeMember(SpawnMembers, MyBuffDuration);
+#if HAS_ENCOUNTER_LOCKING
 	ScopedTypeMember(SpawnMembers, EncounterLockState);
 	ScopedTypeMember(SpawnMembers, EncounterLocked);
-	ScopedTypeMember(SpawnMembers, EncounterLockOwner);
+	ScopedTypeMember(SpawnMembers, EncounterLockOwnerID);
+#endif // HAS_ENCOUNTER_LOCKING
 
 	ScopedTypeMethod(SpawnMethods, DoTarget);
 	ScopedTypeMethod(SpawnMethods, DoFace);
@@ -1297,6 +1301,8 @@ bool MQ2SpawnType::GetMember(SPAWNINFO* pSpawn, const char* Member, char* Index,
 		Dest.Type = pIntType;
 		return true;
 
+#if HAS_ENCOUNTER_LOCKING
+
 	case SpawnMembers::EncounterLockState:
 		Dest.DWord = pSpawn->EncounterLockState;
 		Dest.Type = pIntType;
@@ -1307,13 +1313,15 @@ bool MQ2SpawnType::GetMember(SPAWNINFO* pSpawn, const char* Member, char* Index,
 		Dest.Type = pBoolType;
 		return true;
 
-	case SpawnMembers::EncounterLockOwner:
-		if (PlayerClient* pOwner = pSpawn->EncounterLockOwner)
+	case SpawnMembers::EncounterLockOwnerID:
+		if (PlayerClient* pOwner = pSpawn->GetEncounterLockOwner())
 		{
-			Dest = MakeTypeVar(pOwner);
+			Dest.DWord = pOwner->SpawnID;
+			Dest.Type = pIntType;
 			return true;
 		}
 		return false;
+#endif // HAS_ENCOUNTER_LOCKING
 
 	case SpawnMembers::CombatSkillTicks:
 		Dest.DWord = 0;
