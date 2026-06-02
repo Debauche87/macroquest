@@ -162,11 +162,11 @@ enum class SpawnMembers
 	MyBuff,
 	MyBuffCount,
 	MyBuffDuration,
-#if HAS_ENCOUNTER_LOCKING
 	EncounterLockState,
 	EncounterLocked,
+	EncounterLockOwner,
 	EncounterLockOwnerID,
-#endif // HAS_ENCOUNTER_LOCKING
+
 };
 
 enum class SpawnMethods
@@ -321,11 +321,10 @@ MQ2SpawnType::MQ2SpawnType() : MQ2Type("spawn")
 	ScopedTypeMember(SpawnMembers, MyBuff);
 	ScopedTypeMember(SpawnMembers, MyBuffCount);
 	ScopedTypeMember(SpawnMembers, MyBuffDuration);
-#if HAS_ENCOUNTER_LOCKING
 	ScopedTypeMember(SpawnMembers, EncounterLockState);
 	ScopedTypeMember(SpawnMembers, EncounterLocked);
+	ScopedTypeMember(SpawnMembers, EncounterLockOwner);
 	ScopedTypeMember(SpawnMembers, EncounterLockOwnerID);
-#endif // HAS_ENCOUNTER_LOCKING
 
 	ScopedTypeMethod(SpawnMethods, DoTarget);
 	ScopedTypeMethod(SpawnMethods, DoFace);
@@ -1301,27 +1300,39 @@ bool MQ2SpawnType::GetMember(SPAWNINFO* pSpawn, const char* Member, char* Index,
 		Dest.Type = pIntType;
 		return true;
 
-#if HAS_ENCOUNTER_LOCKING
-
 	case SpawnMembers::EncounterLockState:
-		Dest.DWord = pSpawn->EncounterLockState;
+		Dest.DWord = 0;
 		Dest.Type = pIntType;
+#if HAS_ENCOUNTER_LOCKING
+		Dest.DWord = pSpawn->EncounterLockState;
+#endif
 		return true;
 
 	case SpawnMembers::EncounterLocked:
-		Dest.Set(pSpawn->EncounterLockState != 0);
 		Dest.Type = pBoolType;
+#if HAS_ENCOUNTER_LOCKING
+		Dest.Set(pSpawn->EncounterLockState != 0);
+#else
+		Dest.Set(false);
+#endif
+		return true;
+
+	case SpawnMembers::EncounterLockOwner:
+#if HAS_ENCOUNTER_LOCKING
+		Dest = MakeTypeVar(pSpawn->GetEncounterLockOwner());
+#else
+		Dest = MakeTypeVar(nullptr);
+#endif
 		return true;
 
 	case SpawnMembers::EncounterLockOwnerID:
+		Dest.DWord = 0;
+		Dest.Type = pIntType;
+#if HAS_ENCOUNTER_LOCKING
 		if (PlayerClient* pOwner = pSpawn->GetEncounterLockOwner())
-		{
 			Dest.DWord = pOwner->SpawnID;
-			Dest.Type = pIntType;
-			return true;
-		}
-		return false;
-#endif // HAS_ENCOUNTER_LOCKING
+#endif
+		return true;
 
 	case SpawnMembers::CombatSkillTicks:
 		Dest.DWord = 0;
