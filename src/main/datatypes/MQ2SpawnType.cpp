@@ -62,6 +62,7 @@ enum class SpawnMembers
 	MaxRange,
 	AARank,
 	Casting,
+	CastTimeLeft,
 	Mount,
 	FeetWet,
 	BodyWet,
@@ -220,6 +221,7 @@ MQ2SpawnType::MQ2SpawnType() : MQ2Type("spawn")
 	ScopedTypeMember(SpawnMembers, MaxRange);
 	ScopedTypeMember(SpawnMembers, AARank);
 	ScopedTypeMember(SpawnMembers, Casting);
+	ScopedTypeMember(SpawnMembers, CastTimeLeft);
 	ScopedTypeMember(SpawnMembers, Mount);
 	ScopedTypeMember(SpawnMembers, FeetWet);
 	ScopedTypeMember(SpawnMembers, BodyWet);
@@ -875,6 +877,19 @@ bool MQ2SpawnType::GetMember(SPAWNINFO* pSpawn, const char* Member, char* Index,
 			return true;
 		}
 		return false;
+
+	case SpawnMembers::CastTimeLeft:
+		Dest.Int64 = 0;
+		Dest.Type = pTimeStampType;
+		if (pSpawn->CastingData.SpellETA)
+		{
+			int64_t delta = pSpawn->CastingData.SpellETA - pDisplay->TimeStamp;
+			if (delta > 0)
+			{
+				Dest.Int64 = delta;
+			}
+		}
+		return true;
 
 	case SpawnMembers::Mount:
 		if (pSpawn->Mount)

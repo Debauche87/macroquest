@@ -899,6 +899,78 @@ static void ProcessPendingGroundItems()
 
 #pragma endregion
 
+#pragma region CastingData tracker
+
+// Populates pSpawn->CastingData for remote spawns by detouring
+// CEverQuest::StartCasting (recv 0xCCF6). Native only writes CastingData for
+// the local PC; this mirrors that logic for every other spawn.
+//
+// Packet payload:
+//   +0x00 int32  SpellID
+//   +0x04 int16  SpawnID
+//   +0x06 uint32 CastTimeMs  (unaligned)
+
+#ifdef CEverQuest__StartCasting_x
+
+DETOUR_TRAMPOLINE_DEF(void, StartCasting_Trampoline, (void*, void*))
+static void StartCasting_Detour(void* pThis, void* param2)
+{
+	// Mirrors the native local-PC gates: only write on a real durational cast
+	// from a fresh idle slot. Skip instants (castTimeMs <= 100) and don't stomp
+	// an in-progress cast. End-of-cast cleanup is handled by SweepExpiredCastingData.
+	if (param2 && pDisplay)
+	{
+		int spellId = *static_cast<const int*>(param2);
+		int spawnId = static_cast<short>(static_cast<const int*>(param2)[1]);
+
+		if (spellId > 0 && spawnId > 0)
+		{
+			uint32_t castTimeMs = *reinterpret_cast<const uint32_t*>(static_cast<const char*>(param2) + 6);
+
+			if (castTimeMs > 100)
+			{
+				PlayerClient* pSpawn = GetSpawnByID(spawnId);
+				if (pSpawn && pSpawn != pLocalPlayer
+					&& pSpawn->CastingData.SpellID == -1)
+				{
+					pSpawn->CastingData.SpellID  = spellId;
+					pSpawn->CastingData.SpellETA = static_cast<uint32_t>(pDisplay->TimeStamp + castTimeMs);
+				}
+			}
+		}
+	}
+
+	StartCasting_Trampoline(pThis, param2);
+}
+
+#endif // CEverQuest__StartCasting_x
+
+// Clears CastingData when SpellETA has elapsed — covers emu servers that don't
+// always send an end-cast notification.
+static void SweepExpiredCastingData()
+{
+#ifdef CEverQuest__StartCasting_x
+	if (!pDisplay || !pSpawnList)
+		return;
+
+	uint32_t now = pDisplay->TimeStamp;
+	for (PlayerClient* pSpawn = pSpawnList; pSpawn; pSpawn = pSpawn->pNext)
+	{
+		if (pSpawn == pLocalPlayer)
+			continue;
+
+		auto& cd = pSpawn->CastingData;
+		if (cd.SpellID != -1 && cd.SpellETA != 0 && now >= cd.SpellETA)
+		{
+			cd.SpellID  = -1;
+			cd.SpellETA = 0;
+		}
+	}
+#endif
+}
+
+#pragma endregion
+
 void UpdateMQ2SpawnSort()
 {
 	EnterMQ2Benchmark(bmUpdateSpawnSort);
@@ -962,6 +1034,9 @@ static void Spawns_Initialize()
 	EzDetour(EQGroundItemListManager__Clear, &MyEQGroundItemListManager::FreeItemList_Detour, &MyEQGroundItemListManager::FreeItemList_Trampoline);
 	EzDetour(EQGroundItemListManager__Add, &MyEQGroundItemListManager::Add_Detour, &MyEQGroundItemListManager::Add_Trampoline);
 	EzDetour(EQGroundItemListManager__Delete, &MyEQGroundItemListManager::DeleteItem_Detour, &MyEQGroundItemListManager::DeleteItem_Trampoline);
+#ifdef CEverQuest__StartCasting_x
+	EzDetour(CEverQuest__StartCasting, StartCasting_Detour, StartCasting_Trampoline);
+#endif
 
 	// Load Settings
 	LoadCaptionSettings();
@@ -1036,6 +1111,9 @@ static void Spawns_Shutdown()
 	RemoveDetour(EQGroundItemListManager__Clear);
 	RemoveDetour(EQGroundItemListManager__Add);
 	RemoveDetour(EQGroundItemListManager__Instance);
+#ifdef CEverQuest__StartCasting_x
+	RemoveDetour(CEverQuest__StartCasting);
+#endif
 
 	ProcessPending = false;
 
@@ -1064,6 +1142,8 @@ static void Spawns_Pulse()
 
 	if (gGameState != GAMESTATE_INGAME)
 		return;
+
+	SweepExpiredCastingData();
 
 	// update captions
 	static unsigned long nCaptions = 100;
